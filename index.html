@@ -1,5 +1,7 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 	<head>
+        <meta charset="UTF-8"> 
 		<title>My first three.js app</title>
 		<style>
 			body { margin: 0; }
@@ -13,22 +15,29 @@
 			const module = {
                 //Dažādi mainīgi un norādes uz ainā izveidotajiem objektiem
             frame: 0, cube: null, camera: null, renderer: null, scene: null, controls: null,
+            marsDistance: 227940,
 
             init() {
                 this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 100 );
-                //Kameru novietojam nedaudz atpakaļ un uz augšu, lai redzētu kubu perspektīvā
-                this.camera.position.z = 5;
-                this.camera.position.y = 5;
-                this.renderer = new THREE.WebGLRenderer();
+                this.clock = new THREE.Clock();
+
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1000, this.marsDistance * 20);
+
+                this.controls = new THREE.OrbitControls( this.camera );
+
+                this.camera.position.set( 0, 0, 500000 );
+                this.controls.update();
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
                 this.renderer.setSize( window.innerWidth, window.innerHeight );
                 this.renderer.setClearColor(new THREE.Color(0xEEEEEE));
-                /*Nākošā rinda izveido canvas objektu html body elementā. 
-                Ja vajag ievietot citā elementā, tad to var sameklēt ar document.getElementById()*/
-                document.body.appendChild( this.renderer.domElement );
+                this.renderer.shadowMap.enabled = true;
+
+                document.body.appendChild(this.renderer.domElement);
+
                 this.createWorld();
                 this.setupEvents();
-                this.controls = new THREE.OrbitControls( this.camera );
+
                 this.animate()
             },
 
@@ -47,39 +56,92 @@
             },
 
             createObjects() {
-                var geometry = new THREE.BoxGeometry( 2, 2, 2 );
-                //Kastīte krāsota ar https://en.wikipedia.org/wiki/Gouraud_shading
-                var material = new THREE.MeshLambertMaterial( { color: 0x55ff55 } );
-                this.cube = new THREE.Mesh( geometry, material );
-                this.scene.add( this.cube );
-                this.camera.lookAt(this.cube.position);
 
-                //Plakne ar fizikai pietuvinātu izgaismojumu un redzama no abām pusēm
-                var plane = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshStandardMaterial({
-                    color: 0xFFFFFF,
-                    metalness: 0,
+                var geometry = new THREE.SphereGeometry(this.marsDistance * 9 + 10000, 32, 32);
+                var material = new THREE.MeshStandardMaterial({
+                    map: new THREE.TextureLoader().load('stars_milky_way.jpg'),
                     side: THREE.DoubleSide
-                }));
+                });
+                this.skysphere = new THREE.Mesh(geometry, material);
+                this.scene.add(this.skysphere);
 
-                plane.rotation.x = Math.PI / 2;
-                this.scene.add(plane);
+                this.createPlanet('mars', '2k_mars.jpg', 227.9 * 1000, 6792 / 2); 
+                this.createPlanet('mercury', '2k_mercury.jpg', 57.9 * 1000, 4879 / 2);
+                this.createPlanet('earth', '2k_earth_daymap.jpg', 149.6 * 1000, 12756 / 2);                 
+                this.createMoon('moon');
+                this.createSun();
             },
 
+            createPlanet(name, texture_name, distance, radius) {
+                var geometry = new THREE.SphereGeometry(radius, 32, 32);
+                var material = new THREE.MeshStandardMaterial({
+                     map: new THREE.TextureLoader().load(texture_name),
+                     metalness: 0
+                });
+
+                let planet = new THREE.Mesh(geometry, material);
+                let system = new THREE.Object3D();
+                system.add(planet);
+                this.scene.add(system);
+
+                this[name] = planet;
+                planet.distance = distance;
+
+                planet.castShadow = true;
+                planet.receiveShadow = true;
+
+            },
+
+            createMoon(name, texture_name, distance, radius, system) {
+
+            },
+
+            createSun() {
+                var geometry = new THREE.SphereGeometry(69700 / 2, 32, 32);
+                var material = new THREE.MeshStandardMaterial({
+                    emissive: 0xEEEE99,
+                    emissiveIntensity: 0.8,
+                     map: new THREE.TextureLoader().load('2k_sun.jpg')
+                });
+                this.sun = new THREE.Mesh(geometry, material);
+                this.scene.add(this.sun);
+            },
+
+
+
             createLights() {
-                //Balta prožektorveida gaisma
-                this.spotLight = new THREE.SpotLight(0xFFFFFF);
-                this.spotLight.position.set(-4, 6, -10);
-                this.scene.add(this.spotLight);
+
+              var sunLight = new THREE.PointLight(0xffffff, 1, this.marsDistance * 20, 1);
+                this.scene.add(new THREE.AmbientLight(0x404040));
+                this.scene.add(sunLight);
+
+                sunLight.castShadow = true;
+                sunLight.shadow.mapSize.width = 1024;
+                sunLight.shadow.mapSize.height = 1024;
+                sunLight.shadow.camera.near = this.camera.near;
+                sunLight.shadow.camera.far = this.camera.far;
+
             },
 
             animate() {
                 /*Ja neizmanto moduļu paternu un this, tad () => nav vajadzīgs, 
                 bet var vienkārši norādit callback funkciju ar requestAnimationFrame(animate) */
                 requestAnimationFrame(() => this.animate() );
+
+                let tick = this.clock.getElapsedTime() / 10;
+
+                [this.earth, this.mars, this.mercury].forEach(planet => {
+                planet.parent.position.z = Math.sin(tick) * planet.distance;
+                planet.parent.position.x = Math.cos(tick) * planet.distance;
+                planet.rotation.y = -tick * 30;
+            })
+
+
                 //Ņemot vērā peles kustību atjaunot kameras pozīciju un virzienu
                 module.controls.update();
-                //Zīmēt!
+                //Zīmēt
                 module.renderer.render( module.scene, module.camera );
+
             }    
         }       
 
