@@ -1,0 +1,90 @@
+<html>
+	<head>
+		<title>My first three.js app</title>
+		<style>
+			body { margin: 0; }
+			canvas { width: 100%; height: 100% }
+		</style>
+	</head>
+	<body>
+        <script src="three.min.js"></script>
+        <script src="OrbitControls.js"></script>
+		<script>
+			const module = {
+                //Dažādi mainīgi un norādes uz ainā izveidotajiem objektiem
+            frame: 0, cube: null, camera: null, renderer: null, scene: null, controls: null,
+
+            init() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 100 );
+                //Kameru novietojam nedaudz atpakaļ un uz augšu, lai redzētu kubu perspektīvā
+                this.camera.position.z = 5;
+                this.camera.position.y = 5;
+                this.renderer = new THREE.WebGLRenderer();
+                this.renderer.setSize( window.innerWidth, window.innerHeight );
+                this.renderer.setClearColor(new THREE.Color(0xEEEEEE));
+                /*Nākošā rinda izveido canvas objektu html body elementā. 
+                Ja vajag ievietot citā elementā, tad to var sameklēt ar document.getElementById()*/
+                document.body.appendChild( this.renderer.domElement );
+                this.createWorld();
+                this.setupEvents();
+                this.controls = new THREE.OrbitControls( this.camera );
+                this.animate()
+            },
+
+            setupEvents() {
+                //Canvas mainīs izmēru līdzi logam. () => vajadzīgs, lai this saglabā norādi uz moduli, nevis window
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                })
+            },
+
+            createWorld() {
+                this.createObjects();
+                this.createLights();
+            },
+
+            createObjects() {
+                var geometry = new THREE.BoxGeometry( 2, 2, 2 );
+                //Kastīte krāsota ar https://en.wikipedia.org/wiki/Gouraud_shading
+                var material = new THREE.MeshLambertMaterial( { color: 0x55ff55 } );
+                this.cube = new THREE.Mesh( geometry, material );
+                this.scene.add( this.cube );
+                this.camera.lookAt(this.cube.position);
+
+                //Plakne ar fizikai pietuvinātu izgaismojumu un redzama no abām pusēm
+                var plane = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshStandardMaterial({
+                    color: 0xFFFFFF,
+                    metalness: 0,
+                    side: THREE.DoubleSide
+                }));
+
+                plane.rotation.x = Math.PI / 2;
+                this.scene.add(plane);
+            },
+
+            createLights() {
+                //Balta prožektorveida gaisma
+                this.spotLight = new THREE.SpotLight(0xFFFFFF);
+                this.spotLight.position.set(-4, 6, -10);
+                this.scene.add(this.spotLight);
+            },
+
+            animate() {
+                /*Ja neizmanto moduļu paternu un this, tad () => nav vajadzīgs, 
+                bet var vienkārši norādit callback funkciju ar requestAnimationFrame(animate) */
+                requestAnimationFrame(() => this.animate() );
+                //Ņemot vērā peles kustību atjaunot kameras pozīciju un virzienu
+                module.controls.update();
+                //Zīmēt!
+                module.renderer.render( module.scene, module.camera );
+            }    
+        }       
+
+        module.init();
+
+		</script>
+	</body>
+</html>
