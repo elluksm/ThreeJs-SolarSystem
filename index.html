@@ -65,35 +65,73 @@
                 this.skysphere = new THREE.Mesh(geometry, material);
                 this.scene.add(this.skysphere);
 
-                this.createPlanet('mars', '2k_mars.jpg', 227.9 * 1000, 6792 / 2); 
-                this.createPlanet('mercury', '2k_mercury.jpg', 57.9 * 1000, 4879 / 2);
-                this.createPlanet('earth', '2k_earth_daymap.jpg', 149.6 * 1000, 12756 / 2);                 
-                this.createMoon('moon');
+                this.createMoon('moon','2k_moon.jpg', 38.4 * 1000, 3475 / 2);
+
+                this.createPlanet('mars', '2k_mars.jpg', 227.9 * 1000, 6792 / 2, 0.5); 
+                this.createPlanet('mercury', '2k_mercury.jpg', 57.9 * 1000, 4879 / 2, 4);
+                this.createPlanet('earth', '2k_earth_daymap.jpg', 149.6 * 1000, 12756 / 2, 1, '2k_earth_normal_map.jpg');                 
+                
                 this.createSun();
+
+                let moonSystem = new THREE.Object3D();
+                moonSystem.add(this.moon);
+                
+                let earthSystem = new THREE.Object3D();
+                earthSystem.add(this.earth);
+                earthSystem.add(moonSystem);
+                this.scene.add(earthSystem);
+                
+
+                 let marsSystem = new THREE.Object3D();
+                 marsSystem.add(this.mars);
+                this.scene.add(marsSystem);
+
+                let mercurySystem = new THREE.Object3D();
+                mercurySystem.add(this.mercury);
+                this.scene.add(mercurySystem);
             },
 
-            createPlanet(name, texture_name, distance, radius) {
+            createPlanet(name, texture_name, distance, radius, speed, normal_map_name) {
                 var geometry = new THREE.SphereGeometry(radius, 32, 32);
-                var material = new THREE.MeshStandardMaterial({
-                     map: new THREE.TextureLoader().load(texture_name),
-                     metalness: 0
+                if(normal_map_name) {
+                    var material = new THREE.MeshStandardMaterial({
+                    map: new THREE.TextureLoader().load(texture_name),
+                    normalMap:  new THREE.TextureLoader().load(normal_map_name),
+                    metalness: 0
                 });
+                } else {
+                    var material = new THREE.MeshStandardMaterial({
+                    map: new THREE.TextureLoader().load(texture_name),
+                    metalness: 0
+                });
+                }
 
                 let planet = new THREE.Mesh(geometry, material);
-                let system = new THREE.Object3D();
-                system.add(planet);
-                this.scene.add(system);
+                
 
                 this[name] = planet;
                 planet.distance = distance;
+                planet.speed = speed;
 
                 planet.castShadow = true;
                 planet.receiveShadow = true;
-
             },
 
-            createMoon(name, texture_name, distance, radius, system) {
+            createMoon(name, texture_name, distance, radius) {
+                var geometry = new THREE.SphereGeometry(radius, 32, 32);
+                    var material = new THREE.MeshStandardMaterial({
+                    map: new THREE.TextureLoader().load(texture_name),
+                    metalness: 0
+                });
 
+                let moon = new THREE.Mesh(geometry, material);
+                
+                this[name] = moon;
+                moon.distance = distance;
+
+                moon.castShadow = true;
+                moon.receiveShadow = true;
+                
             },
 
             createSun() {
@@ -131,10 +169,15 @@
                 let tick = this.clock.getElapsedTime() / 10;
 
                 [this.earth, this.mars, this.mercury].forEach(planet => {
-                planet.parent.position.z = Math.sin(tick) * planet.distance;
-                planet.parent.position.x = Math.cos(tick) * planet.distance;
+                planet.parent.position.z = Math.sin(tick* planet.speed) * planet.distance;
+                planet.parent.position.x = Math.cos(tick* planet.speed) * planet.distance;
                 planet.rotation.y = -tick * 30;
             })
+
+                let moonTick = this.clock.getElapsedTime() / 2;
+                this.moon.parent.position.z = Math.sin(moonTick) * this.moon.distance;
+                this.moon.parent.position.x = Math.cos(moonTick) * this.moon.distance;
+                this.moon.rotation.y = -tick * 30;
 
 
                 //Ņemot vērā peles kustību atjaunot kameras pozīciju un virzienu
