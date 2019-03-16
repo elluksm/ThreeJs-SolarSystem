@@ -11,7 +11,11 @@
 	<body>
         <script src="three.min.js"></script>
         <script src="OrbitControls.js"></script>
+        <script src="Lensflare.js"></script>
+        <script src="GPUParticleSystem.js"></script>
+        <script src="orbits.js"></script>
 		<script>
+
 			const module = {
                 //Dažādi mainīgi un norādes uz ainā izveidotajiem objektiem
             frame: 0, cube: null, camera: null, renderer: null, scene: null, controls: null,
@@ -34,11 +38,14 @@
                 this.renderer.shadowMap.enabled = true;
 
                 document.body.appendChild(this.renderer.domElement);
-
+                orbits.init(this.scene);
+                smoke.init(this.scene, 69700 * 9);
                 this.createWorld();
                 this.setupEvents();
 
-                this.animate()
+                
+                this.animate();
+
             },
 
             setupEvents() {
@@ -47,7 +54,33 @@
                     this.camera.aspect = window.innerWidth / window.innerHeight;
                     this.camera.updateProjectionMatrix();
                     this.renderer.setSize(window.innerWidth, window.innerHeight);
-                })
+                }),
+
+                this.raycaster = new THREE.Raycaster();
+                this.mouse = new THREE.Vector2();
+                this.selectedObj = null;
+
+                window.addEventListener('mousemove', (event) => {
+                    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+                    this.raycaster.setFromCamera(this.mouse, this.camera);
+                    var intersects = this.raycaster.intersectObjects(this.scene.children, true);
+                    for (var i = 0; i < intersects.length; i++) {
+                        if (this.changeSelection(intersects[i].object)) break;;
+                    }
+                }, false);
+
+            },
+
+            changeSelection(obj) {
+                if (obj != this.skysphere && this.selectedObj != obj) {
+                    if (this.selectedObj)
+                        this.selectedObj.material.color.set(new THREE.Color());
+                    this.selectedObj = obj;
+                    this.selectedObj.material.color.set(0xff0000);
+                    console.log(obj.name);
+                return true;
+             }
             },
 
             createWorld() {
@@ -80,7 +113,7 @@
                 earthSystem.add(this.earth);
                 earthSystem.add(moonSystem);
                 this.scene.add(earthSystem);
-                
+               
 
                  let marsSystem = new THREE.Object3D();
                  marsSystem.add(this.mars);
@@ -89,6 +122,11 @@
                 let mercurySystem = new THREE.Object3D();
                 mercurySystem.add(this.mercury);
                 this.scene.add(mercurySystem);
+
+                 orbits.createOrbit(this.earth);
+                 orbits.createOrbit(this.mars);
+                 orbits.createOrbit(this.moon);
+                 orbits.createOrbit(this.mercury);
             },
 
             createPlanet(name, texture_name, distance, radius, speed, normal_map_name) {
@@ -112,6 +150,7 @@
                 this[name] = planet;
                 planet.distance = distance;
                 planet.speed = speed;
+                planet.name = name;
 
                 planet.castShadow = true;
                 planet.receiveShadow = true;
@@ -142,7 +181,7 @@
                      map: new THREE.TextureLoader().load('2k_sun.jpg')
                 });
                 this.sun = new THREE.Mesh(geometry, material);
-                this.scene.add(this.sun);
+                // this.scene.add(this.sun);
             },
 
 
@@ -159,6 +198,19 @@
                 sunLight.shadow.camera.near = this.camera.near;
                 sunLight.shadow.camera.far = this.camera.far;
 
+                var textureLoader = new THREE.TextureLoader();
+                var textureFlare0 = textureLoader.load("lensflare0.png");
+                var textureFlare1 = textureLoader.load("lensflare2.png");
+                var textureFlare2 = textureLoader.load("lensflare3.png");
+
+                var lensflare = new THREE.Lensflare();
+
+                lensflare.addElement(new THREE.LensflareElement(textureFlare0, 1012, 0, undefined, THREE.AdditiveBlending));
+                lensflare.addElement(new THREE.LensflareElement(textureFlare1, 512, 0));
+                lensflare.addElement(new THREE.LensflareElement(textureFlare2, 60, 0.9));
+
+                sunLight.add(lensflare);
+
             },
 
             animate() {
@@ -172,24 +224,56 @@
                 planet.parent.position.z = Math.sin(tick* planet.speed) * planet.distance;
                 planet.parent.position.x = Math.cos(tick* planet.speed) * planet.distance;
                 planet.rotation.y = -tick * 30;
-            })
 
+            })
+            
+            
                 let moonTick = this.clock.getElapsedTime() / 2;
                 this.moon.parent.position.z = Math.sin(moonTick) * this.moon.distance;
                 this.moon.parent.position.x = Math.cos(moonTick) * this.moon.distance;
                 this.moon.rotation.y = -tick * 30;
 
 
+                orbits.animate(this.earth);
+                orbits.animate(this.mars);
+                orbits.animate(this.moon);
+                orbits.animate(this.mercury);
                 //Ņemot vērā peles kustību atjaunot kameras pozīciju un virzienu
                 module.controls.update();
                 //Zīmēt
                 module.renderer.render( module.scene, module.camera );
 
-            }    
-        }       
+            }
+        };
 
+        const smoke = {
+                clouds_geom: new THREE.Geometry(),
+                init(scene, bounds) {
+                    let smokeTexture = new THREE.TextureLoader().load('Smoke-Element3.png');
+                    let smokeMaterial = new THREE.PointsMaterial({
+                        size: 700000, map: smokeTexture, transparent: true, depthWrite: false,
+                    });
+
+                    function randPos() {
+                        return bounds * Math.random() - bounds / 2
+                    }
+
+                    for (p = 0; p < 100; p++) {
+                        let vertex = new THREE.Vector3(randPos(), randPos(), randPos());
+                        this.clouds_geom.vertices.push(vertex);
+                    }
+
+                    particles = new THREE.Points(this.clouds_geom, smokeMaterial);
+                    scene.add(particles);
+                },
+
+                animate(delta) {
+                    console.log("animating smoke...")
+                }
+            }
+      
         module.init();
-
+       
 		</script>
 	</body>
 </html>
